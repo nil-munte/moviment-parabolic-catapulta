@@ -1,0 +1,809 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Catapulta parabòlica</title>
+<meta name="description" content="Demo interactiva del moviment parabòlic per a 1r de Batxillerat: una catapulta amb l'eix X en MRU i l'eix Y en MRUA.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: paper de mil·límetres; escenari (canvas) + columna de controls; a sota equacions, resultats i gràfiques */
+:root{
+  --bg:#edf1f0; --surface:#fbfcfc; --ink:#15212a; --muted:#5a6a73; --line:#d2dcdf;
+  --grid:#e2eaec; --grid2:#c6d4d8;
+  --x:#1f5fbf; --y:#c4461a; --wood:#8a5a2b; --wood2:#5b3a1b; --stone:#b1aca1; --stone2:#8d887e;
+  --earth:#d4cab4; --ok:#2c8540; --bad:#b53030; --ball:#2f3438; --chip:#e4eaec;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0e181d; --surface:#142229; --ink:#e1e9ec; --muted:#8fa2ab; --line:#26404b;
+  --grid:#1a2c34; --grid2:#25404b;
+  --x:#6ea8ff; --y:#ff8f5a; --wood:#c48c56; --wood2:#8d5f35; --stone:#6e6b64; --stone2:#57554f;
+  --earth:#3a3327; --ok:#5fc56f; --bad:#f06c6c; --ball:#dfe3e6; --chip:#1c2f37; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0e181d; --surface:#142229; --ink:#e1e9ec; --muted:#8fa2ab; --line:#26404b;
+  --grid:#1a2c34; --grid2:#25404b;
+  --x:#6ea8ff; --y:#ff8f5a; --wood:#c48c56; --wood2:#8d5f35; --stone:#6e6b64; --stone2:#57554f;
+  --earth:#3a3327; --ok:#5fc56f; --bad:#f06c6c; --ball:#dfe3e6; --chip:#1c2f37; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{margin:0}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:16px;padding-block:20px 40px;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 20px}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(26px,3.4vw,34px);letter-spacing:-.01em;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:0;font-size:14px}
+.sub b{font-weight:600}
+.tx{color:var(--x)} .ty{color:var(--y)}
+h2{font-family:var(--f-display);font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0}
+h3{font-family:var(--f-display);font-size:18px;font-weight:600;margin:0}
+
+.main{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:18px;align-items:start}
+@media (max-width:920px){.main{grid-template-columns:minmax(0,1fr)}}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.stagecol{display:flex;flex-direction:column;gap:10px;min-width:0}
+.stage{position:relative;aspect-ratio:16/10;min-height:300px;max-height:620px;width:100%;overflow:hidden}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;border-radius:10px}
+.toast{position:absolute;top:14px;right:14px;padding:8px 14px;border-radius:8px;font-family:var(--f-display);font-weight:600;font-size:17px;background:var(--surface);border:1.5px solid currentColor;transition:opacity .25s, transform .25s;pointer-events:none}
+.toast.ok{color:var(--ok)} .toast.bad{color:var(--bad)}
+.toast.off{opacity:0;transform:translateY(-6px)}
+
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;font-weight:500;cursor:pointer;border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;min-height:38px}
+button:hover{border-color:var(--muted)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--x);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--ink);color:var(--surface);border-color:var(--ink);font-weight:600;padding-inline:20px}
+button.primary:hover{opacity:.9}
+.spacer{flex:1}
+.scrub{display:flex;align-items:center;gap:10px;flex:1 1 220px;min-width:0}
+.scrub input{flex:1;min-width:0}
+.scrub output{font-family:var(--f-mono);font-size:13px;min-width:78px;text-align:right;font-variant-numeric:tabular-nums}
+
+.readout{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));overflow:hidden}
+.readout div{padding:8px 12px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:1px;min-width:0}
+.readout div:last-child{border-right:0}
+.readout span{font-size:12px;color:var(--muted)}
+.readout b{font-family:var(--f-mono);font-weight:500;font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
+@media (max-width:620px){.stage{aspect-ratio:auto;height:360px}.readout{grid-template-columns:repeat(3,minmax(0,1fr))}.readout div:nth-child(3){border-right:0}.readout div:nth-child(-n+3){border-bottom:1px solid var(--line)}}
+
+.controls{padding:6px 16px 14px;display:flex;flex-direction:column}
+.group{padding-block:12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:12px}
+.group:last-child{border-bottom:0}
+.param{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center}
+.param label{font-size:14px}
+.param input[type=range]{grid-column:1/-1;width:100%}
+.pin{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--muted)}
+.pin input{width:66px;font:inherit;font-family:var(--f-mono);font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:3px 6px;text-align:right}
+input[type=range]{accent-color:var(--ink)}
+input[type=checkbox]{accent-color:var(--ink);width:16px;height:16px;margin:0}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.seg.s3{grid-template-columns:repeat(3,1fr)}
+.seg button{padding:5px 4px;min-height:32px;font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.chk{display:flex;align-items:center;gap:9px;font-size:14px;cursor:pointer}
+.chk select{margin-left:auto;font:inherit;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:2px 4px}
+.swatch{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:2px}
+.castlebox{display:flex;flex-direction:column;gap:10px}
+.row2{display:grid;grid-template-columns:1fr;gap:8px}
+.row2 .pin{justify-content:space-between;color:var(--ink)}
+.score{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+
+.lower{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+@media (max-width:760px){.lower{grid-template-columns:minmax(0,1fr)}}
+.eq{padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.eq .hd{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.eq .hd small{color:var(--muted);font-size:13px}
+.eq.xaxis{border-top:3px solid var(--x)} .eq.yaxis{border-top:3px solid var(--y)}
+.f{font-family:var(--f-mono);font-size:14.5px;line-height:1.7;overflow-x:auto;white-space:nowrap}
+.f .gen{color:var(--muted)}
+.f .num{font-weight:500}
+.now{font-family:var(--f-mono);font-size:13.5px;background:var(--chip);border-radius:6px;padding:6px 10px;font-variant-numeric:tabular-nums;overflow-x:auto;white-space:nowrap}
+i.v{font-family:var(--f-body)}
+
+.res{padding:14px 16px 16px;display:flex;flex-direction:column;gap:12px}
+.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:900px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.card span{font-size:13px;color:var(--muted)}
+.card b{font-family:var(--f-mono);font-weight:500;font-size:20px;font-variant-numeric:tabular-nums}
+.card small{font-family:var(--f-mono);font-size:12px;color:var(--muted);overflow-x:auto;white-space:nowrap}
+.hiddenmsg{color:var(--muted);font-size:14px;margin:0;padding:8px 0}
+
+.graphs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+@media (max-width:820px){.graphs{grid-template-columns:minmax(0,1fr)}}
+.gcard{padding:12px 14px 10px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.gcard .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.gcard .hd small{color:var(--muted);font-size:12.5px}
+.gcard canvas{width:100%;height:170px;display:block}
+.legend{font-size:12.5px;color:var(--muted);display:flex;gap:12px}
+footer{color:var(--muted);font-size:13px;max-width:72ch}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Catapulta parabòlica</h1>
+      <p class="sub">Moviment parabòlic · 1r de Batxillerat · <b class="tx">eix X: MRU</b> · <b class="ty">eix Y: MRUA</b></p>
+    </div>
+    <p class="sub">Tecla <b>espai</b> per llançar</p>
+  </header>
+
+  <div class="main">
+    <div class="stagecol">
+      <div class="panel stage">
+        <canvas id="stage" aria-label="Escenari: catapulta i trajectòria del projectil"></canvas>
+        <div id="toast" class="toast off" role="status"></div>
+      </div>
+      <div class="bar">
+        <button class="primary" id="bLaunch">Llança</button>
+        <button id="bPause" disabled>Pausa</button>
+        <button id="bReset">Reinicia</button>
+        <div class="scrub">
+          <input type="range" id="scrub" min="0" max="1" step="0.001" value="0" aria-label="Instant de temps">
+          <output id="tout">t = 0,00 s</output>
+        </div>
+      </div>
+      <div class="panel readout" aria-live="off">
+        <div><span>t</span><b id="rt">0,00 s</b></div>
+        <div><span class="tx">x</span><b id="rx">0,00 m</b></div>
+        <div><span class="ty">y</span><b id="ry">0,00 m</b></div>
+        <div><span class="tx">v<sub>x</sub></span><b id="rvx">0,00 m/s</b></div>
+        <div><span class="ty">v<sub>y</sub></span><b id="rvy">0,00 m/s</b></div>
+        <div><span>|v|</span><b id="rv">0,00 m/s</b></div>
+      </div>
+    </div>
+
+    <aside class="panel controls" aria-label="Paràmetres">
+      <div class="group">
+        <h2>Llançament</h2>
+        <div class="param">
+          <label for="v0r">Velocitat inicial <i class="v">v</i><sub>0</sub></label>
+          <div class="pin"><input type="number" id="v0n" min="1" max="40" step="0.5" aria-label="v0 en m/s">m/s</div>
+          <input type="range" id="v0r" min="1" max="40" step="0.5" aria-label="Velocitat inicial">
+        </div>
+        <div class="param">
+          <label for="ar">Angle de llançament <i class="v">α</i></label>
+          <div class="pin"><input type="number" id="an" min="0" max="90" step="1" aria-label="Angle en graus">°</div>
+          <input type="range" id="ar" min="0" max="90" step="1" aria-label="Angle de llançament">
+        </div>
+        <div class="param">
+          <label for="y0r">Altura inicial <i class="v">y</i><sub>0</sub></label>
+          <div class="pin"><input type="number" id="y0n" min="0" max="40" step="0.5" aria-label="y0 en metres">m</div>
+          <input type="range" id="y0r" min="0" max="40" step="0.5" aria-label="Altura inicial">
+        </div>
+      </div>
+
+      <div class="group">
+        <h2>Gravetat</h2>
+        <div class="seg" id="gseg">
+          <button data-g="9.81">Terra</button><button data-g="1.62">Lluna</button><button data-g="3.71">Mart</button><button data-g="24.79">Júpiter</button>
+        </div>
+        <div class="param">
+          <label for="gr"><i class="v">g</i></label>
+          <div class="pin"><input type="number" id="gn" min="0.5" max="30" step="0.01" aria-label="g en m/s²">m/s²</div>
+          <input type="range" id="gr" min="0.5" max="30" step="0.01" aria-label="Gravetat">
+        </div>
+      </div>
+
+      <div class="group">
+        <h2>Què es mostra</h2>
+        <label class="chk"><input type="checkbox" id="oPred" checked> Trajectòria prevista</label>
+        <label class="chk"><input type="checkbox" id="oVec" checked> Vectors velocitat <span><span class="swatch" style="background:var(--x)"></span><span class="swatch" style="background:var(--y)"></span></span></label>
+        <label class="chk"><input type="checkbox" id="oProj" checked> Projeccions sobre els eixos</label>
+        <label class="chk"><input type="checkbox" id="oStrobe" checked> Posició cada
+          <select id="oDt" aria-label="Interval de temps">
+            <option value="0.1">0,1 s</option><option value="0.25">0,25 s</option><option value="0.5" selected>0,5 s</option><option value="1">1 s</option>
+          </select></label>
+        <label class="chk"><input type="checkbox" id="oRes" checked> Resultats numèrics</label>
+      </div>
+
+      <div class="group">
+        <h2>Velocitat de l'animació</h2>
+        <div class="seg s3" id="sseg">
+          <button data-s="1">1×</button><button data-s="0.5">½×</button><button data-s="0.2">⅕×</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <label class="chk"><input type="checkbox" id="oCastle"> <b>Repte: encerta el castell</b></label>
+        <div class="castlebox" id="castleBox" hidden>
+          <div class="row2">
+            <div class="pin"><label for="cD">Distància</label><span><input type="number" id="cD" min="6" max="200" step="1"> m</span></div>
+            <div class="pin"><label for="cH">Altura</label><span><input type="number" id="cH" min="1" max="40" step="0.5"> m</span></div>
+          </div>
+          <div class="bar"><button id="bCastle">Nou castell</button><span class="spacer"></span><span class="score" id="score">Encerts 0 / 0</span></div>
+        </div>
+      </div>
+
+      <div class="group">
+        <button id="bClear">Esborra les traces anteriors</button>
+      </div>
+    </aside>
+  </div>
+
+  <div class="lower">
+    <section class="panel eq xaxis">
+      <div class="hd"><h3 class="tx">Eix X · MRU</h3><small>a<sub>x</sub> = 0 → v<sub>x</sub> constant</small></div>
+      <div class="f">
+        <div class="gen">x(t) = x<sub>0</sub> + v<sub>0x</sub>·t</div>
+        <div>v<sub>0x</sub> = v<sub>0</sub>·cos α = <span id="eVox1"></span></div>
+        <div class="num tx">x(t) = <span id="eX"></span></div>
+        <div class="num tx">v<sub>x</sub>(t) = <span id="eVx"></span></div>
+      </div>
+      <div class="now" id="nowX"></div>
+    </section>
+    <section class="panel eq yaxis">
+      <div class="hd"><h3 class="ty">Eix Y · MRUA</h3><small>a<sub>y</sub> = −g = <span id="eAy"></span></small></div>
+      <div class="f">
+        <div class="gen">y(t) = y<sub>0</sub> + v<sub>0y</sub>·t − ½·g·t²  ·  v<sub>y</sub>(t) = v<sub>0y</sub> − g·t</div>
+        <div>v<sub>0y</sub> = v<sub>0</sub>·sin α = <span id="eVoy1"></span></div>
+        <div class="num ty">y(t) = <span id="eY"></span></div>
+        <div class="num ty">v<sub>y</sub>(t) = <span id="eVy"></span></div>
+      </div>
+      <div class="now" id="nowY"></div>
+    </section>
+  </div>
+
+  <section class="panel res">
+    <div class="hd" style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap"><h3>Resultats</h3><small style="color:var(--muted);font-size:13px">fins que el projectil arriba a terra (y = 0)</small></div>
+    <div class="cards" id="cards">
+      <div class="card"><span>Temps de vol t<sub>v</sub></span><b id="kT"></b><small id="kTf"></small></div>
+      <div class="card"><span>Abast x<sub>max</sub></span><b id="kR"></b><small id="kRf"></small></div>
+      <div class="card"><span>Altura màxima y<sub>max</sub></span><b id="kH"></b><small id="kHf"></small></div>
+      <div class="card"><span>Velocitat en arribar a terra</span><b id="kV"></b><small id="kVf"></small></div>
+    </div>
+    <p class="hiddenmsg" id="resHidden" hidden>Resultats amagats. Calculeu-los primer i després activeu «Resultats» per comprovar-los.</p>
+  </section>
+
+  <div class="graphs">
+    <section class="panel gcard">
+      <div class="hd"><h3 class="tx">x – t</h3><small>recta: MRU</small></div>
+      <canvas id="gX" aria-label="Gràfica posició x en funció del temps"></canvas>
+    </section>
+    <section class="panel gcard">
+      <div class="hd"><h3 class="ty">y – t</h3><small>paràbola: MRUA</small></div>
+      <canvas id="gY" aria-label="Gràfica posició y en funció del temps"></canvas>
+    </section>
+    <section class="panel gcard">
+      <div class="hd"><h3>v – t</h3><span class="legend"><span><span class="swatch" style="background:var(--x)"></span>v<sub>x</sub></span><span><span class="swatch" style="background:var(--y)"></span>v<sub>y</sub></span></span></div>
+      <canvas id="gV" aria-label="Gràfica de les components de la velocitat en funció del temps"></canvas>
+    </section>
+  </div>
+
+  <footer>Criteri de signes: l'eix Y és positiu cap amunt i l'origen és al peu de la torre, per tant a<sub>y</sub> = −g. Es menysprea la fricció amb l'aire. El projectil surt del punt (0, y<sub>0</sub>).</footer>
+</div>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const DEG = Math.PI / 180;
+
+// ---------- estat ----------
+const P = { v0: 20, a: 45, y0: 5, g: 9.81 };
+const opt = { pred: true, vec: true, proj: true, strobe: true, dt: 0.5, res: true, castle: false, speed: 1 };
+const castle = { D: 42, H: 6, w: 4 };
+const run = { phase: 'ready', t: 0, anim: 0, p: null, end: null, ghosted: false };
+let ghosts = [];
+const score = { hit: 0, tries: 0 };
+const view = { k: 0 };
+
+// ---------- física ----------
+function phys(p) {
+  const vx = p.v0 * Math.cos(p.a * DEG), vy0 = p.v0 * Math.sin(p.a * DEG), g = p.g;
+  const tF = (vy0 + Math.sqrt(vy0 * vy0 + 2 * g * p.y0)) / g;
+  const tA = Math.max(0, vy0 / g);
+  const hMax = p.y0 + (vy0 > 0 ? vy0 * vy0 / (2 * g) : 0);
+  const vyF = vy0 - g * tF;
+  return { vx, vy0, tF, tA, hMax, R: vx * tF, vF: Math.hypot(vx, vyF), vyF, angF: Math.atan2(vyF, vx) / DEG };
+}
+const pos = (p, f, t) => [f.vx * t, p.y0 + f.vy0 * t - 0.5 * p.g * t * t];
+
+function endInfo(p, c) {
+  const f = phys(p);
+  if (c) {
+    const xa = c.D - c.w / 2, xb = c.D + c.w / 2;
+    if (f.vx > 1e-9) {
+      const tw = xa / f.vx;
+      if (tw >= 0 && tw <= f.tF) {
+        const yw = pos(p, f, tw)[1];
+        if (yw <= c.H) return { t: tw, x: xa, y: yw, kind: 'face' };
+      }
+    }
+    const disc = f.vy0 * f.vy0 + 2 * p.g * (p.y0 - c.H);
+    if (disc >= 0) {
+      const tt = (f.vy0 + Math.sqrt(disc)) / p.g;
+      const xt = f.vx * tt;
+      if (tt >= 0 && tt <= f.tF && xt >= xa && xt <= xb) return { t: tt, x: xt, y: c.H, kind: 'top' };
+    }
+  }
+  return { t: f.tF, x: f.R, y: 0, kind: 'ground' };
+}
+const endFor = p => endInfo(p, opt.castle ? castle : null);
+const cur = () => run.phase === 'ready' ? P : run.p;
+const curEnd = () => run.phase === 'ready' ? endFor(P) : run.end;
+
+// ---------- format ----------
+function fmt(v, d = 2) {
+  if (!isFinite(v)) return '—';
+  if (Math.abs(v) < 0.5 * Math.pow(10, -d)) v = 0;
+  return v.toFixed(d).replace('.', ',').replace('-', '−');
+}
+const fmtN = v => String(+v.toFixed(6)).replace('.', ',').replace('-', '−');
+function niceStep(span, n) {
+  const raw = span / n, p = Math.pow(10, Math.floor(Math.log10(raw))), m = raw / p;
+  return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+}
+
+// ---------- canvas helpers ----------
+function fit(cv) {
+  const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  const w = Math.max(1, Math.round(r.width * d)), h = Math.max(1, Math.round(r.height * d));
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  const c = cv.getContext('2d'); c.setTransform(d, 0, 0, d, 0, 0);
+  return { c, W: r.width, H: r.height };
+}
+let T = {};
+function readTokens() {
+  const s = getComputedStyle(document.documentElement);
+  ['bg','surface','ink','muted','line','grid','grid2','x','y','wood','wood2','stone','stone2','earth','ok','bad','ball'].forEach(k => T[k] = s.getPropertyValue('--' + k).trim());
+}
+function arrow(c, x1, y1, x2, y2, col, w = 2) {
+  const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy);
+  if (L < 3) return;
+  const ux = dx / L, uy = dy / L, h = Math.min(9, L * 0.45);
+  c.strokeStyle = col; c.fillStyle = col; c.lineWidth = w; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2 - ux * h * 0.7, y2 - uy * h * 0.7); c.stroke();
+  c.beginPath(); c.moveTo(x2, y2);
+  c.lineTo(x2 - ux * h - uy * h * 0.45, y2 - uy * h + ux * h * 0.45);
+  c.lineTo(x2 - ux * h + uy * h * 0.45, y2 - uy * h - ux * h * 0.45);
+  c.closePath(); c.fill();
+}
+function subLabel(c, base, sub, x, y, col, align = 'left') {
+  c.fillStyle = col;
+  c.font = 'italic 500 14px ' + getFont('body');
+  const bw = c.measureText(base).width;
+  c.font = '500 10px ' + getFont('body');
+  const sw = sub ? c.measureText(sub).width : 0;
+  let x0 = align === 'center' ? x - (bw + sw) / 2 : align === 'right' ? x - bw - sw : x;
+  c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+  c.font = 'italic 500 14px ' + getFont('body'); c.fillText(base, x0, y);
+  if (sub) { c.font = '500 10px ' + getFont('body'); c.fillText(sub, x0 + bw + 0.5, y + 4); }
+}
+const FONTS = { body: '"IBM Plex Sans", system-ui, sans-serif', mono: '"IBM Plex Mono", ui-monospace, monospace' };
+const getFont = k => FONTS[k];
+
+// ---------- escenari ----------
+const stage = $('stage');
+function targetView(W, H, ox, gy, mr, mt) {
+  const p = cur(), e = curEnd(), f = phys(p);
+  let nx = Math.max(e.x, 15), ny = Math.max(f.hMax, p.y0, 6);
+  if (opt.castle) { nx = Math.max(nx, castle.D + castle.w / 2 + 2); ny = Math.max(ny, castle.H + 2); }
+  ghosts.forEach(g => { nx = Math.max(nx, g.end.x); ny = Math.max(ny, phys(g.p).hMax); });
+  nx *= 1.06; ny *= 1.14;
+  return Math.max(0.3, Math.min((W - ox - mr) / nx, (gy - mt) / ny));
+}
+
+function pathOf(c, p, f, t1, sx, sy) {
+  const n = Math.max(24, Math.ceil(t1 * 60));
+  c.beginPath();
+  for (let i = 0; i <= n; i++) {
+    const [x, y] = pos(p, f, t1 * i / n);
+    i ? c.lineTo(sx(x), sy(y)) : c.moveTo(sx(x), sy(y));
+  }
+}
+
+function drawStage() {
+  const { c, W, H } = fit(stage);
+  const ml = 46, mr = 18, mt = 22, mb = 28;
+  const ox = ml + 74, gy = H - mb;
+  const kT = targetView(W, H, ox, gy, mr, mt);
+  view.k = view.k ? view.k + (kT - view.k) * 0.18 : kT;
+  if (Math.abs(view.k - kT) < 1e-3) view.k = kT;
+  const k = view.k;
+  const sx = x => ox + x * k, sy = y => gy - y * k;
+  const p = cur(), f = phys(p), e = curEnd();
+  const t = run.phase === 'ready' ? 0 : run.t;
+
+  // fons i quadrícula
+  c.fillStyle = T.surface; c.fillRect(0, 0, W, H);
+  const xMaxW = (W - mr - ox) / k, yMaxW = (gy - mt) / k;
+  const step = niceStep(Math.max(xMaxW, yMaxW * 1.4), 9);
+  const minor = step / 5;
+  c.lineWidth = 1;
+  if (minor * k >= 6) {
+    c.strokeStyle = T.grid; c.beginPath();
+    for (let x = 0; x <= xMaxW + 1e-9; x += minor) { const X = Math.round(sx(x)) + .5; c.moveTo(X, mt - 8); c.lineTo(X, gy); }
+    for (let y = 0; y <= yMaxW + minor; y += minor) { const Y = Math.round(sy(y)) + .5; if (Y < mt - 8) break; c.moveTo(ml, Y); c.lineTo(W - mr + 10, Y); }
+    c.stroke();
+  }
+  c.strokeStyle = T.grid2; c.beginPath();
+  for (let x = 0; x <= xMaxW + 1e-9; x += step) { const X = Math.round(sx(x)) + .5; c.moveTo(X, mt - 8); c.lineTo(X, gy); }
+  for (let y = 0; y <= yMaxW + step; y += step) { const Y = Math.round(sy(y)) + .5; if (Y < mt - 8) break; c.moveTo(ml, Y); c.lineTo(W - mr + 10, Y); }
+  c.stroke();
+
+  // terra
+  c.fillStyle = T.earth; c.fillRect(0, gy, W, mb);
+  c.strokeStyle = T.ink; c.lineWidth = 1.5; c.beginPath(); c.moveTo(0, gy + .5); c.lineTo(W, gy + .5); c.stroke();
+  // eix Y
+  c.strokeStyle = T.muted; c.lineWidth = 1; c.beginPath(); c.moveTo(ml + .5, mt - 8); c.lineTo(ml + .5, gy); c.stroke();
+  // etiquetes
+  c.font = '11px ' + FONTS.mono; c.fillStyle = T.muted; c.textBaseline = 'middle';
+  c.textAlign = 'center';
+  for (let x = 0; x <= xMaxW + 1e-9; x += step) { const X = sx(x); if (X > W - mr - 34) break; c.fillText(fmtN(x), X, gy + 15); }
+  c.textAlign = 'right'; c.fillText('x (m)', W - 6, gy + 15);
+  for (let y = step; y <= yMaxW + 1e-9; y += step) { const Y = sy(y); if (Y < mt + 4) break; c.fillText(fmtN(y), ml - 6, Y); }
+  c.fillText('0', ml - 6, gy - 6);
+  c.textAlign = 'left'; c.fillText('y (m)', 6, 11);
+
+  // traces anteriors
+  ghosts.forEach(g => {
+    const gf = phys(g.p);
+    c.save(); c.globalAlpha = 0.5; c.strokeStyle = T.muted; c.lineWidth = 1.5;
+    pathOf(c, g.p, gf, g.end.t, sx, sy); c.stroke(); c.restore();
+    c.fillStyle = T.muted; c.font = '11px ' + FONTS.mono; c.textAlign = 'right'; c.textBaseline = 'bottom';
+    const [ex, ey] = [sx(g.end.x), sy(g.end.y)];
+    c.fillText(fmtN(g.p.v0) + ' m/s · ' + g.p.a + '°', Math.max(ox + 90, ex - 8), ey - 4);
+  });
+
+  // trajectòria prevista
+  if (opt.pred) {
+    c.save(); c.setLineDash([5, 5]); c.strokeStyle = T.ink; c.globalAlpha = 0.45; c.lineWidth = 1.5;
+    pathOf(c, p, f, e.t, sx, sy); c.stroke(); c.restore();
+  }
+  // marcadors de resultats
+  if (opt.res && opt.pred) {
+    c.font = '11px ' + FONTS.mono; c.fillStyle = T.muted; c.strokeStyle = T.muted; c.lineWidth = 1;
+    if (f.tA > 0 && f.tA < e.t) {
+      const X = sx(f.vx * f.tA), Y = sy(f.hMax);
+      c.save(); c.setLineDash([2, 3]); c.beginPath(); c.moveTo(ml, Y); c.lineTo(X, Y); c.stroke(); c.restore();
+      c.textAlign = 'left'; c.textBaseline = 'bottom';
+      c.fillText('y max = ' + fmt(f.hMax) + ' m', ml + 8, Y - 4);
+    }
+    if (e.kind === 'ground') {
+      const X = sx(f.R);
+      c.beginPath(); c.moveTo(X, gy - 7); c.lineTo(X, gy + 3); c.stroke();
+      c.textAlign = 'center'; c.textBaseline = 'bottom';
+      c.fillText('x max = ' + fmt(f.R) + ' m', Math.min(Math.max(X, ox + 40), W - 60), gy - 10);
+    }
+  }
+
+  // castell
+  if (opt.castle) drawCastle(c, sx, sy, gy);
+
+  // estroboscòpia
+  if (opt.strobe && run.phase !== 'ready' && run.phase !== 'windup') {
+    for (let n = 0; n * opt.dt <= t + 1e-9; n++) {
+      const [x, y] = pos(p, f, n * opt.dt);
+      const X = sx(x), Y = sy(y);
+      c.fillStyle = T.surface; c.strokeStyle = T.ink; c.lineWidth = 1.2;
+      c.beginPath(); c.arc(X, Y, 3.5, 0, 7); c.fill(); c.stroke();
+      if (opt.proj) {
+        c.fillStyle = T.x; c.beginPath(); c.arc(X, gy, 3, 0, 7); c.fill();
+        c.fillStyle = T.y; c.beginPath(); c.arc(ml, Y, 3, 0, 7); c.fill();
+      }
+    }
+  }
+
+  // trajecte recorregut
+  if (run.phase !== 'ready' && run.phase !== 'windup' && t > 0) {
+    c.strokeStyle = T.ink; c.lineWidth = 2.2; pathOf(c, p, f, t, sx, sy); c.stroke();
+  }
+
+  // torre + catapulta
+  const tipX = sx(0), tipY = sy(p.y0);
+  let arm = p.a;
+  if (run.phase === 'windup') {
+    const a = run.anim;
+    const ease = u => u * u * (3 - 2 * u);
+    arm = a < 0.32 ? p.a + (200 - p.a) * ease(a / 0.32) : 200 + (p.a - 200) * Math.min(1, (a - 0.32) / 0.12);
+  }
+  const L0 = 36, need = L0 * Math.sin(p.a * DEG) + 34;
+  const s = Math.max(0.45, Math.min(1, (gy - tipY + 22) / need));
+  const L = L0 * s;
+  const pvx = tipX - L * Math.cos(p.a * DEG), pvy = tipY + L * Math.sin(p.a * DEG);
+  const baseY = pvy + 22 * s, groundC = baseY + 12 * s;
+  // torre (o fossat)
+  const tl = pvx - 34 * s - 6, tr = pvx + 28 * s + 6;
+  if (groundC < gy - 0.5) {
+    c.fillStyle = T.stone; c.fillRect(tl, groundC, tr - tl, gy - groundC);
+    c.strokeStyle = T.stone2; c.lineWidth = 1;
+    c.beginPath();
+    let row = 0;
+    for (let y = gy; y > groundC + 1; y -= 9, row++) {
+      c.moveTo(tl, y + .5); c.lineTo(tr, y + .5);
+      for (let x = tl + (row % 2 ? 9 : 18); x < tr; x += 18) { c.moveTo(x + .5, y); c.lineTo(x + .5, Math.max(groundC, y - 9)); }
+    }
+    c.stroke();
+    c.strokeStyle = T.stone2; c.lineWidth = 1.5; c.strokeRect(tl + .5, groundC + .5, tr - tl - 1, gy - groundC);
+  } else if (groundC > gy + 0.5) {
+    c.fillStyle = T.surface; c.fillRect(tl, gy - 1, tr - tl, groundC - gy + 1);
+    c.strokeStyle = T.ink; c.lineWidth = 1.2;
+    c.beginPath(); c.moveTo(tl, gy); c.lineTo(tl, groundC); c.lineTo(tr, groundC); c.lineTo(tr, gy); c.stroke();
+  }
+  // estructura
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  c.strokeStyle = T.wood2; c.lineWidth = 4 * s;
+  c.beginPath(); c.moveTo(pvx - 20 * s, baseY); c.lineTo(pvx, pvy); c.lineTo(pvx + 16 * s, baseY); c.stroke();
+  c.fillStyle = T.wood; c.fillRect(pvx - 32 * s, baseY - 3 * s, 58 * s, 6 * s);
+  c.fillStyle = T.wood2;
+  [pvx - 22 * s, pvx + 16 * s].forEach(wx => { c.beginPath(); c.arc(wx, baseY + 5 * s, 6 * s, 0, 7); c.fill(); });
+  c.fillStyle = T.surface; [pvx - 22 * s, pvx + 16 * s].forEach(wx => { c.beginPath(); c.arc(wx, baseY + 5 * s, 2 * s, 0, 7); c.fill(); });
+  // contrapès i braç
+  const ca = arm * DEG;
+  const cx = pvx - Math.cos(ca) * L * 0.38, cy = pvy + Math.sin(ca) * L * 0.38;
+  const tx = pvx + Math.cos(ca) * L, ty = pvy - Math.sin(ca) * L;
+  c.strokeStyle = T.wood; c.lineWidth = 5 * s;
+  c.beginPath(); c.moveTo(cx, cy); c.lineTo(tx, ty); c.stroke();
+  c.fillStyle = T.stone2; c.fillRect(cx - 7 * s, cy - 2 * s, 14 * s, 13 * s);
+  c.fillStyle = T.wood2; c.beginPath(); c.arc(pvx, pvy, 3.2 * s, 0, 7); c.fill();
+  // cullera
+  c.strokeStyle = T.wood2; c.lineWidth = 2.5 * s;
+  c.beginPath(); c.arc(tx, ty, 6 * s, ca * -1 + Math.PI * 0.1, -ca + Math.PI * 0.9, false); c.stroke();
+
+  // angle
+  if (run.phase === 'ready') {
+    c.strokeStyle = T.muted; c.lineWidth = 1; c.save(); c.setLineDash([3, 3]);
+    c.beginPath(); c.moveTo(tipX, tipY); c.lineTo(tipX + 52, tipY); c.stroke(); c.restore();
+    c.strokeStyle = T.ink; c.lineWidth = 1.2;
+    c.beginPath(); c.arc(tipX, tipY, 32, -p.a * DEG, 0); c.stroke();
+    c.fillStyle = T.ink; c.font = '500 12px ' + FONTS.mono; c.textAlign = 'left'; c.textBaseline = 'middle';
+    const la = -p.a * DEG / 2;
+    c.fillText('α = ' + p.a + '°', tipX + 38 * Math.cos(la) + 4, tipY + 38 * Math.sin(la) - (p.a < 20 ? 8 : 0));
+  }
+
+  // projectil
+  let bx, by;
+  if (run.phase === 'windup') { bx = tx; by = ty; }
+  else { const [x, y] = pos(p, f, t); bx = sx(x); by = sy(y); }
+  const [xN, yN] = pos(p, f, t);
+  const vxN = f.vx, vyN = f.vy0 - p.g * t;
+
+  if (opt.proj && run.phase !== 'windup') {
+    c.save(); c.setLineDash([3, 4]); c.lineWidth = 1.2;
+    c.strokeStyle = T.x; c.beginPath(); c.moveTo(bx, by); c.lineTo(bx, gy); c.stroke();
+    c.strokeStyle = T.y; c.beginPath(); c.moveTo(bx, by); c.lineTo(ml, by); c.stroke();
+    c.restore();
+    c.fillStyle = T.x; c.fillRect(bx - 5, gy - 5, 10, 10);
+    c.fillStyle = T.y; c.fillRect(ml - 5, by - 5, 10, 10);
+  }
+
+  c.fillStyle = T.ball; c.beginPath(); c.arc(bx, by, 5.5, 0, 7); c.fill();
+
+  // vectors velocitat
+  if (opt.vec && run.phase !== 'windup' && p.v0 > 0) {
+    const kv = 72 / p.v0;
+    const ex = bx + vxN * kv, ey = by - vyN * kv;
+    arrow(c, bx, by, ex, by, T.x, 2.2);
+    arrow(c, bx, by, bx, ey, T.y, 2.2);
+    c.save(); c.setLineDash([2, 3]); c.strokeStyle = T.muted; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(ex, by); c.lineTo(ex, ey); c.lineTo(bx, ey); c.stroke(); c.restore();
+    arrow(c, bx, by, ex, ey, T.ink, 2.4);
+    if (Math.abs(vxN * kv) > 14) subLabel(c, 'v', 'x', bx + vxN * kv / 2, by + 16, T.x, 'center');
+    if (Math.abs(vyN * kv) > 14) subLabel(c, 'v', 'y', bx - 8, by - vyN * kv / 2 + 4, T.y, 'right');
+    subLabel(c, 'v', t === 0 ? '0' : '', ex + 6, ey - 4, T.ink);
+  }
+
+  return { t, xN, yN, vxN, vyN };
+}
+
+function drawCastle(c, sx, sy, gy) {
+  const xa = sx(castle.D - castle.w / 2), xb = sx(castle.D + castle.w / 2), top = sy(castle.H);
+  const w = xb - xa, h = gy - top;
+  const m = Math.min(8, h * 0.18), n = 3, mw = w / (2 * n - 1);
+  c.fillStyle = T.stone; c.strokeStyle = T.stone2; c.lineWidth = 1.2;
+  c.beginPath(); c.moveTo(xa, gy); c.lineTo(xa, top);
+  for (let i = 0; i < n; i++) {
+    const x0 = xa + i * 2 * mw;
+    c.lineTo(x0 + mw, top);
+    if (i < n - 1) { c.lineTo(x0 + mw, top + m); c.lineTo(x0 + 2 * mw, top + m); c.lineTo(x0 + 2 * mw, top); }
+  }
+  c.lineTo(xb, top); c.lineTo(xb, gy); c.closePath(); c.fill(); c.stroke();
+  // porta
+  const dw = Math.min(w * 0.36, 14), dh = Math.min(h * 0.4, 18);
+  c.fillStyle = T.wood2; c.beginPath();
+  c.moveTo(xa + w / 2 - dw / 2, gy); c.lineTo(xa + w / 2 - dw / 2, gy - dh + dw / 2);
+  c.arc(xa + w / 2, gy - dh + dw / 2, dw / 2, Math.PI, 0); c.lineTo(xa + w / 2 + dw / 2, gy); c.closePath(); c.fill();
+  // bandera
+  c.strokeStyle = T.ink; c.lineWidth = 1.2; c.beginPath(); c.moveTo(xa + w / 2, top); c.lineTo(xa + w / 2, top - 18); c.stroke();
+  c.fillStyle = T.bad; c.beginPath(); c.moveTo(xa + w / 2, top - 18); c.lineTo(xa + w / 2 + 11, top - 14.5); c.lineTo(xa + w / 2, top - 11); c.closePath(); c.fill();
+  c.fillStyle = T.muted; c.font = '11px ' + FONTS.mono; c.textAlign = 'center'; c.textBaseline = 'bottom';
+  c.fillText(fmtN(castle.D) + ' m · ' + fmtN(castle.H) + ' m', xa + w / 2, top - 22);
+}
+
+// ---------- gràfiques ----------
+function drawGraph(cv, o) {
+  const { c, W, H } = fit(cv);
+  const ml = 42, mr = 10, mt = 10, mb = 22;
+  c.clearRect(0, 0, W, H);
+  const tMax = Math.max(o.tMax, 1e-3);
+  let yMin = o.yMin, yMax = o.yMax;
+  if (yMax - yMin < 1e-6) { yMax = yMin + 1; }
+  const pad = (yMax - yMin) * 0.08; if (yMin < 0) yMin -= pad; yMax += pad;
+  const X = t => ml + (t / tMax) * (W - ml - mr), Y = v => H - mb - (v - yMin) / (yMax - yMin) * (H - mb - mt);
+  c.lineWidth = 1; c.font = '10.5px ' + FONTS.mono; c.fillStyle = T.muted;
+  const ts = niceStep(tMax, 5), vs = niceStep(yMax - yMin, 4);
+  c.strokeStyle = T.grid; c.beginPath();
+  for (let t = 0; t <= tMax + 1e-9; t += ts) { const x = Math.round(X(t)) + .5; c.moveTo(x, mt); c.lineTo(x, H - mb); }
+  for (let v = Math.ceil(yMin / vs) * vs; v <= yMax + 1e-9; v += vs) { const y = Math.round(Y(v)) + .5; c.moveTo(ml, y); c.lineTo(W - mr, y); }
+  c.stroke();
+  c.textAlign = 'center'; c.textBaseline = 'top';
+  for (let t = 0; t <= tMax + 1e-9; t += ts) { const x = X(t); if (x > W - mr - 26) continue; c.fillText(fmtN(t), x, H - mb + 5); }
+  c.textAlign = 'right'; c.fillText('t (s)', W - mr, H - mb + 5);
+  c.textBaseline = 'middle';
+  for (let v = Math.ceil(yMin / vs) * vs; v <= yMax + 1e-9; v += vs) c.fillText(fmtN(v), ml - 5, Y(v));
+  c.strokeStyle = T.muted; c.beginPath(); c.moveTo(ml + .5, mt); c.lineTo(ml + .5, H - mb); c.stroke();
+  const z = Math.round(Y(Math.max(yMin, 0))) + .5; c.beginPath(); c.moveTo(ml, z); c.lineTo(W - mr, z); c.stroke();
+  const N = 80;
+  o.series.forEach(s => {
+    c.save(); c.setLineDash([4, 4]); c.globalAlpha = 0.4; c.strokeStyle = s.color; c.lineWidth = 1.5;
+    c.beginPath(); for (let i = 0; i <= N; i++) { const t = tMax * i / N; i ? c.lineTo(X(t), Y(s.f(t))) : c.moveTo(X(t), Y(s.f(t))); } c.stroke(); c.restore();
+    if (o.tNow > 0) {
+      c.strokeStyle = s.color; c.lineWidth = 2.2;
+      c.beginPath(); for (let i = 0; i <= N; i++) { const t = o.tNow * i / N; i ? c.lineTo(X(t), Y(s.f(t))) : c.moveTo(X(t), Y(s.f(t))); } c.stroke();
+    }
+    c.fillStyle = s.color; c.beginPath(); c.arc(X(o.tNow), Y(s.f(o.tNow)), 4, 0, 7); c.fill();
+  });
+}
+
+// ---------- textos ----------
+let lastKey = '';
+function updateTexts(st) {
+  const p = cur(), f = phys(p), e = curEnd();
+  const key = [p.v0, p.a, p.y0, p.g, opt.castle, castle.D, castle.H, e.t].join('|');
+  if (key !== lastKey) {
+    lastKey = key;
+    $('eVox1').textContent = fmtN(p.v0) + '·cos ' + p.a + '° = ' + fmt(f.vx) + ' m/s';
+    $('eX').textContent = '0 + ' + fmt(f.vx) + '·t  (m)';
+    $('eVx').textContent = fmt(f.vx) + ' m/s';
+    $('eAy').textContent = '−' + fmt(p.g) + ' m/s²';
+    $('eVoy1').textContent = fmtN(p.v0) + '·sin ' + p.a + '° = ' + fmt(f.vy0) + ' m/s';
+    $('eY').textContent = fmtN(p.y0) + ' + ' + fmt(f.vy0) + '·t − ' + fmt(p.g / 2, 3) + '·t²  (m)';
+    $('eVy').textContent = fmt(f.vy0) + ' − ' + fmt(p.g) + '·t  (m/s)';
+    $('kT').textContent = fmt(f.tF) + ' s';
+    $('kTf').textContent = 'y(t) = 0 → t = ' + fmt(f.tF) + ' s';
+    $('kR').textContent = fmt(f.R) + ' m';
+    $('kRf').textContent = fmt(f.vx) + ' · ' + fmt(f.tF) + ' = ' + fmt(f.R) + ' m';
+    $('kH').textContent = fmt(f.hMax) + ' m';
+    $('kHf').textContent = 'v_y = 0 → t = ' + fmt(f.tA) + ' s';
+    $('kV').textContent = fmt(f.vF) + ' m/s';
+    $('kVf').textContent = 'angle ' + fmt(f.angF, 1) + '° amb l\'horitzontal';
+    const sc = $('scrub'); sc.max = e.t.toFixed(3);
+  }
+  const t = st.t;
+  $('rt').textContent = fmt(t) + ' s';
+  $('rx').textContent = fmt(st.xN) + ' m';
+  $('ry').textContent = fmt(st.yN) + ' m';
+  $('rvx').textContent = fmt(st.vxN) + ' m/s';
+  $('rvy').textContent = fmt(st.vyN) + ' m/s';
+  $('rv').textContent = fmt(Math.hypot(st.vxN, st.vyN)) + ' m/s';
+  $('tout').textContent = 't = ' + fmt(t) + ' s';
+  if (document.activeElement !== $('scrub')) $('scrub').value = t;
+  $('nowX').textContent = 'x(' + fmt(t) + ') = ' + fmt(f.vx) + '·' + fmt(t) + ' = ' + fmt(st.xN) + ' m';
+  $('nowY').textContent = 'y(' + fmt(t) + ') = ' + fmtN(p.y0) + ' + ' + fmt(f.vy0) + '·' + fmt(t) + ' − ' + fmt(p.g / 2, 3) + '·' + fmt(t) + '² = ' + fmt(st.yN) + ' m';
+  const bp = $('bPause');
+  bp.disabled = !(run.phase === 'flying' || run.phase === 'windup' || run.phase === 'paused');
+  bp.textContent = run.phase === 'paused' ? 'Continua' : 'Pausa';
+}
+
+function drawGraphs(st) {
+  const p = cur(), f = phys(p), e = curEnd();
+  const yEnd = pos(p, f, e.t)[1];
+  drawGraph($('gX'), { tMax: e.t, yMin: 0, yMax: e.x, tNow: st.t, series: [{ f: t => f.vx * t, color: T.x }] });
+  drawGraph($('gY'), { tMax: e.t, yMin: 0, yMax: Math.max(f.hMax, p.y0, yEnd), tNow: st.t, series: [{ f: t => pos(p, f, t)[1], color: T.y }] });
+  const vyE = f.vy0 - p.g * e.t;
+  drawGraph($('gV'), { tMax: e.t, yMin: Math.min(0, vyE), yMax: Math.max(f.vx, f.vy0, 0), tNow: st.t,
+    series: [{ f: () => f.vx, color: T.x }, { f: t => f.vy0 - p.g * t, color: T.y }] });
+}
+
+// ---------- missatges ----------
+let toastTimer;
+function toast(msg, ok) {
+  const el = $('toast'); el.textContent = msg; el.className = 'toast ' + (ok ? 'ok' : 'bad');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.add('off'), 3200);
+}
+function finish() {
+  if (run.ghosted) return;
+  run.ghosted = true;
+  ghosts.push({ p: { ...run.p }, end: { ...run.end } });
+  if (ghosts.length > 6) ghosts.shift();
+  if (opt.castle && run.counted) {
+    const e = run.end;
+    if (e.kind !== 'ground') { score.hit++; toast(e.kind === 'face' ? 'Encert! Impacte a la muralla' : 'Encert! Dins del castell', true); }
+    else {
+      const xa = castle.D - castle.w / 2;
+      const d = e.x < xa ? xa - e.x : e.x - (castle.D + castle.w / 2);
+      toast((e.x < xa ? 'Curt per ' : 'Llarg per ') + fmt(d, 1) + ' m', false);
+    }
+    updateScore();
+  }
+}
+function updateScore() { $('score').textContent = 'Encerts ' + score.hit + ' / ' + score.tries; }
+
+// ---------- control ----------
+function launch() {
+  run.p = { ...P }; run.end = endFor(run.p); run.t = 0; run.anim = 0; run.phase = 'windup'; run.ghosted = false;
+  run.counted = opt.castle; if (opt.castle) { score.tries++; updateScore(); }
+  $('toast').classList.add('off');
+}
+function reset() { run.phase = 'ready'; run.t = 0; $('toast').classList.add('off'); }
+function paramChanged() { if (run.phase !== 'ready') reset(); }
+
+$('bLaunch').onclick = launch;
+$('bReset').onclick = reset;
+$('bPause').onclick = () => {
+  if (run.phase === 'flying' || run.phase === 'windup') { run.resume = run.phase; run.phase = 'paused'; }
+  else if (run.phase === 'paused') run.phase = run.resume === 'windup' ? 'windup' : 'flying';
+};
+$('bClear').onclick = () => { ghosts = []; };
+$('scrub').addEventListener('input', ev => {
+  const v = +ev.target.value;
+  if (run.phase === 'ready') { run.p = { ...P }; run.end = endFor(run.p); run.ghosted = false; run.counted = false; }
+  run.t = Math.min(v, run.end.t); run.resume = 'flying';
+  if (run.t >= run.end.t - 1e-6) { run.phase = 'done'; finish(); } else run.phase = 'paused';
+});
+document.addEventListener('keydown', ev => {
+  if (ev.code !== 'Space') return;
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA'].includes(tag)) return;
+  ev.preventDefault(); launch();
+});
+
+function bindPair(r, n, key, lo, hi, after) {
+  const R = $(r), N = $(n);
+  const set = v => { v = Math.min(hi, Math.max(lo, v)); P[key] = v; R.value = v; N.value = v; paramChanged(); after && after(); };
+  R.value = P[key]; N.value = P[key];
+  R.addEventListener('input', () => set(+R.value));
+  N.addEventListener('change', () => { if (N.value !== '' && isFinite(+N.value)) set(+N.value); else N.value = P[key]; });
+  return set;
+}
+bindPair('v0r', 'v0n', 'v0', 1, 40);
+bindPair('ar', 'an', 'a', 0, 90);
+bindPair('y0r', 'y0n', 'y0', 0, 40);
+const setG = bindPair('gr', 'gn', 'g', 0.5, 30, markG);
+function markG() { document.querySelectorAll('#gseg button').forEach(b => b.setAttribute('aria-pressed', Math.abs(+b.dataset.g - P.g) < 1e-6)); }
+document.querySelectorAll('#gseg button').forEach(b => b.onclick = () => setG(+b.dataset.g));
+markG();
+function markS() { document.querySelectorAll('#sseg button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.s === opt.speed)); }
+document.querySelectorAll('#sseg button').forEach(b => b.onclick = () => { opt.speed = +b.dataset.s; markS(); });
+markS();
+
+[['oPred', 'pred'], ['oVec', 'vec'], ['oProj', 'proj'], ['oStrobe', 'strobe']].forEach(([id, k]) => $(id).addEventListener('change', e => opt[k] = e.target.checked));
+$('oDt').addEventListener('change', e => opt.dt = +e.target.value);
+$('oRes').addEventListener('change', e => { opt.res = e.target.checked; $('cards').hidden = !opt.res; $('resHidden').hidden = opt.res; });
+$('oCastle').addEventListener('change', e => { opt.castle = e.target.checked; $('castleBox').hidden = !opt.castle; paramChanged(); lastKey = ''; });
+function syncCastle() { $('cD').value = castle.D; $('cH').value = castle.H; lastKey = ''; }
+$('cD').addEventListener('change', e => { const v = +e.target.value; if (isFinite(v) && v >= 6) castle.D = Math.min(200, v); syncCastle(); paramChanged(); });
+$('cH').addEventListener('change', e => { const v = +e.target.value; if (isFinite(v) && v > 0) castle.H = Math.min(40, v); syncCastle(); paramChanged(); });
+$('bCastle').onclick = () => { castle.D = Math.round(14 + Math.random() * 48); castle.H = Math.round(2 + Math.random() * 8); syncCastle(); paramChanged(); };
+syncCastle();
+
+// ---------- bucle ----------
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (run.phase === 'windup') { run.anim += dt * Math.max(opt.speed, 0.5); if (run.anim >= 0.44) run.phase = 'flying'; }
+  else if (run.phase === 'flying') {
+    run.t += dt * opt.speed;
+    if (run.t >= run.end.t) { run.t = run.end.t; run.phase = 'done'; finish(); }
+  }
+  readTokens();
+  const st = drawStage();
+  updateTexts(st);
+  drawGraphs(st);
+  requestAnimationFrame(frame);
+}
+readTokens();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
